@@ -1,10 +1,12 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
+import ast
 
 st.markdown("""
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 """, unsafe_allow_html=True)
+
 
 
 # ===============================
@@ -51,7 +53,7 @@ def load_genres():
 
     df_gen[genre_col] = df_gen[genre_col].apply(safe_parse)
 
-    return dict(zip(df_gen["id"], df_gen[genre_col]))
+    return dict(zip(df_gen["id"].astype(str), df_gen[genre_col]))
 
 genres_dict = load_genres()
 
@@ -109,8 +111,9 @@ def retrieve_tracks(query_artist, query_track, query_album, algorithm, n):
 
     results = []
     for i, row in filtered.head(n).iterrows():
-        track_id = row["id"]
+        track_id = str(row["id"])
         genre_list = genres_dict.get(track_id, [])
+
 
         results.append({
             "artist": row["artist"],
