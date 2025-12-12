@@ -18,11 +18,42 @@ def load_data():
     # YouTube URLs file
     df_urls = pd.read_csv("id_url_mmsr.tsv", sep="\t")
 
+    df_genres = pd.read_csv("id_genres_mmsr.tsv", sep="\t")
+
     # Merge based on common ID column
     # Use the correct shared key "id"
     df_merged = df_info.merge(df_urls, on="id", how="left")
+    df_merged = df_merged.merge(df_genres, on="id", how="left")
     
     return df_merged
+
+@st.cache_data
+def load_genres():
+    df_gen = pd.read_csv("id_genres_mmsr.tsv", sep="\t")
+
+    # Detect correct column name automatically
+    genre_col = None
+    for col in df_gen.columns:
+        if col.lower() in ["genre", "genres", "genre_list"]:
+            genre_col = col
+    if genre_col is None:
+        st.error("❌ Could not find genre column in id_genres_mmsr.tsv")
+        return {}
+
+    # Convert Python-list-like strings safely
+    def safe_parse(x):
+        if isinstance(x, str):
+            try:
+                return ast.literal_eval(x)
+            except:
+                return []
+        return []
+
+    df_gen[genre_col] = df_gen[genre_col].apply(safe_parse)
+
+    return dict(zip(df_gen["id"], df_gen[genre_col]))
+
+genres_dict = load_genres()
 
 df = load_data()
 
@@ -30,6 +61,7 @@ df = load_data()
 all_artists = sorted(df["artist"].dropna().unique().tolist())
 all_tracks = sorted(df["song"].dropna().unique().tolist())
 all_albums = sorted(df["album_name"].dropna().unique().tolist())
+all_genres = sorted(df["genre"].dropna().unique().tolist())
 
 # ===============================
 # Page config
@@ -92,11 +124,14 @@ def retrieve_tracks(query_artist, query_track, query_album, algorithm, n):
 
     results = []
     for i, row in filtered.head(n).iterrows():
+        track_id = row["id"]
+        genre_list = genres_dict.get(track_id, [])
+
         results.append({
             "artist": row["artist"],
             "track": row["song"],
             "album_name": row["album_name"],
-            "genre": row.get("genre", "Unknown"),
+            "genre": ", ".join(genre_list) if genre_list else "Unknown",
             "url": row.get("url", ""),
             "score": 1.0
         })
@@ -136,7 +171,17 @@ if retrieve_button:
 
                     metrics_col, results_col = st.columns([1, 2])
                     with metrics_col:
-                        query_genre = df[(df["artist"]==query_artist) & (df["song"]==query_track)]["genre"].iloc[0] if query_track != "(none)" else None
+                        # Get genre from our genre dictionary instead of df (ignore if missing)
+                        if query_track != "(none)":
+                            try:
+                                # find ID of the selected track
+                                track_id = df[(df["artist"] == query_artist) & (df["song"] == query_track)]["id"].iloc[0]
+                                query_genre = genres_dict.get(track_id, [])
+                            except:
+                                query_genre = []
+                        else:
+                            query_genre = []
+
                         metrics = compute_metrics(results, query_genre)
                         st.markdown("### Evaluation Metrics")
                         for k, v in metrics.items():
