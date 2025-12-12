@@ -94,21 +94,6 @@ with st.container():
             default=["Random baseline"]
         )
 
-        # --- Search button centered on its own row ---
-        button_row = st.columns([3, 1, 3])
-        with button_row[1]:
-            retrieve_button = """
-            <div style="text-align: center; margin-top: 5px;">
-                <button onclick="window.location.reload()" 
-                        style="...">
-                    <i class="fas fa-search"></i> Retrieve Tracks
-                </button>
-            </div>
-            """
-            st.markdown(retrieve_button, unsafe_allow_html=True)
-
-
-
 
 # ===============================
 # Retrieval function (placeholder)
@@ -155,10 +140,9 @@ def compute_metrics(results, query_genre):
 # ===============================
 # Display results
 # ===============================
-if retrieve_button:
-    if not algorithms:
-        st.warning("Please select at least one algorithm.")
-    else:
+if not algorithms:
+    st.warning("⚠️ Please select at least one retrieval algorithm.")
+else:
         tab_objects = st.tabs(algorithms)
         for idx, algo in enumerate(algorithms):
             with tab_objects[idx]:
