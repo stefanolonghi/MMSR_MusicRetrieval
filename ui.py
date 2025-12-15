@@ -2,6 +2,13 @@ import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
 import ast
+import numpy as np
+from retrieval_algorithms import (
+    load_feature_matrix_tsv, _l2_normalize_rows,
+    retrieve_random, retrieve_unimodal_cosine,
+    retrieve_late_fusion, build_early_fusion_matrix
+)
+
 
 st.markdown("""
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
