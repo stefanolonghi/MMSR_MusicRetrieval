@@ -1,0 +1,16 @@
+pyproject.toml
+src/mmsr_alg/__init__.py
+src/mmsr_alg/catalog.py
+src/mmsr_alg/features.py
+src/mmsr_alg/io.py
+src/mmsr_alg/retrieval/__init__.py
+src/mmsr_alg/retrieval/cosine.py
+src/mmsr_alg/retrieval/random_baseline.py
+src/mmsr_alg/retrieval/registry.py
+src/mmsr_alg/retrieval/system.py
+src/mmsr_alg/retrieval/unimodal.py
+src/mmsr_algorithms.egg-info/PKG-INFO
+src/mmsr_algorithms.egg-info/SOURCES.txt
+src/mmsr_algorithms.egg-info/dependency_links.txt
+src/mmsr_algorithms.egg-info/requires.txt
+src/mmsr_algorithms.egg-info/top_level.txt
