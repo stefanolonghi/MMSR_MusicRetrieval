@@ -1,6 +1,7 @@
 import streamlit as st
 import streamlit.components.v1 as components
 from loader import load_data, load_genres
+from feature_utils import load_and_normalize_split 
 
 # --- app startup ---
 from pathlib import Path
@@ -17,9 +18,24 @@ DATA = Path("data/retrieval")
 @st.cache_resource
 def init_catalog_and_system():
     cat = load_catalog(DATA)
-    cat.X_lyrics = l2_normalize(load_feature_matrix(DATA / "id_lyrics_bert_mmsr.tsv", cat.id_to_idx))
+
+    #cat.X_lyrics = l2_normalize(load_feature_matrix(DATA / "id_lyrics_bert_mmsr.tsv", cat.id_to_idx))
+    cat.X_lyrics = load_and_normalize_split([
+        DATA / "id_lyrics_bert_mmsr_part1.tsv",
+        DATA / "id_lyrics_bert_mmsr_part2.tsv"
+    ], cat.id_to_idx)
+
     cat.X_audio  = l2_normalize(load_feature_matrix(DATA / "id_mfcc_bow_mmsr.tsv", cat.id_to_idx))
-    cat.X_video  = l2_normalize(load_feature_matrix(DATA / "id_vgg19_mmsr.tsv", cat.id_to_idx))
+
+    #cat.X_video  = l2_normalize(load_feature_matrix(DATA / "id_vgg19_mmsr.tsv", cat.id_to_idx))
+    cat.X_video = load_and_normalize_split([
+        DATA / "id_vgg19_mmsr_part1.tsv",
+        DATA / "id_vgg19_mmsr_part2.tsv",
+        DATA / "id_vgg19_mmsr_part3.tsv",
+        DATA / "id_vgg19_mmsr_part4.tsv",
+        DATA / "id_vgg19_mmsr_part5.tsv"
+    ], cat.id_to_idx)
+
     cat.X_early  = build_early_fusion_matrix(cat.X_lyrics, cat.X_audio, cat.X_video, (1/3, 1/3, 1/3))
 
     retrieval_system = RetrievalSystem(cat, ALGORITHMS)
@@ -80,6 +96,11 @@ with st.container():
 if query_track == "(none)":
     st.warning("⚠️ Please select a track to run the retrieval.")
     st.stop()
+    
+if not algorithms:
+    st.warning("⚠️ Please select at least one retrieval algorithm.")
+    st.stop() 
+
 if algorithms:
     matches = cat.tracks[cat.tracks["song"] == query_track]
     
