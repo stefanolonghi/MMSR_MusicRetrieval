@@ -3,9 +3,10 @@ import ast
 import streamlit as st
 from pathlib import Path
 
+HERE = Path(__file__).parent  
+
 @st.cache_data
 def load_data():
-    HERE = Path(__file__).parent       # cartella dove si trova questo script
     DATA = HERE / "data"               
     df_info = pd.read_csv(DATA / "id_information_mmsr.tsv", sep="\t")
     df_urls = pd.read_csv(DATA / "id_url_mmsr.tsv", sep="\t")
@@ -15,7 +16,8 @@ def load_data():
 
 @st.cache_data
 def load_genres():
-    df_gen = pd.read_csv("data/id_genres_mmsr.tsv", sep="\t")
+    DATA = HERE / "data" 
+    df_gen = pd.read_csv(DATA / "id_genres_mmsr.tsv", sep="\t")
     genre_col = next((c for c in df_gen.columns if c.lower() in ["genre", "genres", "genre_list"]), None)
     if genre_col is None:
         st.error("❌ Could not find genre column")
