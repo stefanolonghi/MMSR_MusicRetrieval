@@ -13,7 +13,8 @@ from mmsr_alg.retrieval.fusion_early import build_early_fusion_matrix
 from mmsr_alg.utils import decorate_result
 from mmsr_alg.eval.runner import evaluate_one_query
 
-DATA = Path("data/retrieval")
+HERE = Path(__file__).parent
+DATA = HERE/"data/retrieval"
 
 @st.cache_resource
 def init_catalog_and_system():
