@@ -39,11 +39,42 @@ def init_catalog_and_system():
 
     cat.X_early  = build_early_fusion_matrix(cat.X_lyrics, cat.X_audio, cat.X_video, (1/3, 1/3, 1/3))
 
-    retrieval_system = RetrievalSystem(cat, ALGORITHMS)
+    #neural  network
+    cat.nn_matrices = {}
+    nn_root = DATA / "nn_models"
+
+    if nn_root.exists():
+        # Cicla sulle cartelle principali (es: vgg19_lyrics_bert_padding)
+        for model_dir in nn_root.iterdir():
+            if model_dir.is_dir():
+                # Cerchiamo f1 e f2 ovunque dentro model_dir
+                for f_prefix in ["f1", "f2"]:
+                    # rglob cerca ricorsivamente in tutte le sottocartelle
+                    tsv_files = list(model_dir.rglob(f"{f_prefix}_*.tsv"))
+                    
+                    if tsv_files:
+                        # Prendiamo il primo file trovato per quel prefisso
+                        target_file = tsv_files[0]
+                        # Nome per la UI (es: vgg19_lyrics_bert_f1)
+                        algo_key = f"{model_dir.name.replace('_padding','')}_{f_prefix}"
+                        
+                        try:
+                            cat.nn_matrices[algo_key] = l2_normalize(
+                                load_feature_matrix(target_file, cat.id_to_idx)
+                            )
+                        except Exception as e:
+                            st.error(f"Errore caricamento {algo_key}: {e}")
+
+
+    # import function that joins simple altigorithms and neural networks algorithms
+    from mmsr_alg.retrieval.registry import get_combined_registry
+    all_algos = get_combined_registry(cat)
+
+    retrieval_system = RetrievalSystem(cat, all_algos)
     return cat, retrieval_system
 
 cat, retrieval_system = init_catalog_and_system()
-
+ALGORITHMS = retrieval_system.algorithms
 
 # --- CSS Font Awesome ---
 st.markdown("""<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">""", unsafe_allow_html=True)
@@ -90,8 +121,10 @@ with st.container():
         # --- Slider e algoritmi ---
         row2 = st.columns([1,2])
         num_results = row2[0].slider("Number of results", 1, 20, 5)
-        available_algorithms = list(ALGORITHMS.keys())
-        algorithms = row2[1].multiselect("Select retrieval algorithms", available_algorithms, default=["random"])
+        # old: available_algorithms = list(ALGORITHMS.keys())
+        available_algorithms = available_algorithms = sorted(list(retrieval_system.algorithms.keys()))
+
+        algorithms = row2[1].multiselect("Select retrieval algorithms", available_algorithms)
 
 # --- Run algorithms ---
 if query_track == "(none)":
@@ -170,12 +203,14 @@ for tab_idx, algo in enumerate(algorithms):
         with metrics_col:
             st.markdown("### Evaluation Metrics")
             for k, v in metrics.items():
-                st.write(f"**{k}:** {v}")
+                st.write(f"**{k}:** {v:.4f}")
 
         # --- Results ---
         with results_col:
             st.markdown("### Retrieved Tracks")
             for r in ui_results:
+                score_val = r.get("score")
+                score_display = f"{score_val:.4f}" if score_val is not None else "N/A"
                 yt = r.get("url", "")
                 video_html = ""
 
@@ -206,7 +241,7 @@ for tab_idx, algo in enumerate(algorithms):
                     color:#262730;
                 ">
                     <div style="flex:1;">
-                        <h4 style="margin:0 0 6px 0;">🎵 {r['track']} (Score: {r['score']})</h4>
+                        <h4 style="margin:0 0 6px 0;">🎵 {r['track']} (Score: {score_display})</h4>
                         <p><strong>Artist:</strong> {r['artist']}</p>
                         <p><strong>Album:</strong> {r['album_name']}</p>
                         <p><strong>Genre:</strong> {r['genre']}</p>
