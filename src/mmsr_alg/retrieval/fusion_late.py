@@ -76,3 +76,29 @@ def late_fusion_algo(
         ranked_ids=[catalog.ids[i] for i in idx],
         scores=fused[idx].tolist(),
     )
+
+def late_fusion_custom(catalog, qidx: int, k: int, matrices: List[np.ndarray], weights: List[float]) -> RetrievalResult:
+    """
+    Versione generica di Late Fusion che accetta una lista di matrici e pesi.
+    """
+    fused = None
+    
+    for X, w in zip(matrices, weights):
+        scores = _minmax_norm(_cosine_scores(qidx, X))
+        if fused is None:
+            fused = scores * w
+        else:
+            fused += scores * w
+            
+    fused[qidx] = -np.inf
+    
+    # Top-k ranking
+    idx = np.argsort(fused)[::-1][:k]
+    
+    return RetrievalResult(
+        query_id=catalog.ids[qidx],
+        algo="neural_late_fusion",
+        k=k,
+        ranked_ids=[catalog.ids[i] for i in idx],
+        scores=fused[idx].tolist(),
+    )

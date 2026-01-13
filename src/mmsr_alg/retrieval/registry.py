@@ -1,7 +1,7 @@
 
 from .random_baseline import random_algo
 from .unimodal import lyrics_algo, audio_algo, video_algo
-from .fusion_late import late_fusion_algo
+from .fusion_late import late_fusion_algo, late_fusion_custom
 from .fusion_early import early_fusion_algo
 from .system import RetrievalResult
 from .cosine import topk_cosine
@@ -35,6 +35,21 @@ def get_combined_registry(catalog):
                 return fn
             
             algos[key] = make_neural_fn(key)
+    
+    # 2. new: NEURAL LATE FUSION
+        # select f1 branches of refined models (autoencoders)
+        smart_audio = catalog.nn_matrices.get("mfcc_bow_mfcc_bow_f1")
+        smart_video = catalog.nn_matrices.get("vgg19_vgg19_f1")
+        smart_lyrics = catalog.nn_matrices.get("lyrics_bert_lyrics_bert_f1")
+
+        if all(m is not None for m in [smart_audio, smart_video, smart_lyrics]):
+            def neural_late_fusion_fn(cat, qidx, k, seed=None):
+                return late_fusion_custom(
+                    cat, qidx, k, 
+                    matrices=[smart_audio, smart_video, smart_lyrics],
+                    weights=[1/3, 1/3, 1/3]
+                )
+            algos["neural_late_fusion"] = neural_late_fusion_fn
             
     return algos
 
