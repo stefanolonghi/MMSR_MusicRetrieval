@@ -1,12 +1,13 @@
 import streamlit as st
 import streamlit.components.v1 as components
-from loader import load_data, load_genres
+from loader import load_data, load_genres, precompute_all_system_metrics
 from feature_utils import load_and_normalize_split 
 
 # --- app startup ---
 from pathlib import Path
 from mmsr_alg.io import load_catalog
 from mmsr_alg.features import load_feature_matrix, l2_normalize
+from mmsr_alg.retrieval.fusion_late import late_fusion_custom
 from mmsr_alg.retrieval.system import RetrievalSystem
 from mmsr_alg.retrieval.registry import ALGORITHMS
 from mmsr_alg.retrieval.fusion_early import build_early_fusion_matrix
@@ -37,34 +38,54 @@ def init_catalog_and_system():
         DATA / "id_vgg19_mmsr_part5.tsv"
     ], cat.id_to_idx)
 
-    cat.X_early  = build_early_fusion_matrix(cat.X_lyrics, cat.X_audio, cat.X_video, (1/3, 1/3, 1/3))
+    cat.X_early = build_early_fusion_matrix(cat.X_lyrics, cat.X_audio, cat.X_video, (1/3, 1/3, 1/3))
+
+
 
     #neural  network
     cat.nn_matrices = {}
-    nn_root = DATA / "nn_models"
 
-    if nn_root.exists():
-        # Cicla sulle cartelle principali (es: vgg19_lyrics_bert_padding)
-        for model_dir in nn_root.iterdir():
-            if model_dir.is_dir():
-                # Cerchiamo f1 e f2 ovunque dentro model_dir
-                for f_prefix in ["f1", "f2"]:
-                    # rglob cerca ricorsivamente in tutte le sottocartelle
-                    tsv_files = list(model_dir.rglob(f"{f_prefix}_*.tsv"))
-                    
-                    if tsv_files:
-                        # Prendiamo il primo file trovato per quel prefisso
-                        target_file = tsv_files[0]
-                        # Nome per la UI (es: vgg19_lyrics_bert_f1)
-                        algo_key = f"{model_dir.name.replace('_padding','')}_{f_prefix}"
-                        
-                        try:
-                            cat.nn_matrices[algo_key] = l2_normalize(
-                                load_feature_matrix(target_file, cat.id_to_idx)
-                            )
-                        except Exception as e:
-                            st.error(f"Errore caricamento {algo_key}: {e}")
+    cat.nn_matrices["lyrics_lyrics"] = l2_normalize(
+        load_feature_matrix(
+            DATA / "nn_models/lyrics_bert_lyrics_bert_padding/f1_lyrics_bert_f2_lyrics_bert_padding/f2_lyrics_bert.tsv",
+            cat.id_to_idx
+        )
+    )
 
+    cat.nn_matrices["video_audio"] = l2_normalize(
+        load_feature_matrix(
+            DATA / "nn_models/vgg19_mfcc_bow_padding/f1_vgg19_f2_mfcc_bow_padding/f2_vgg19.tsv",
+            cat.id_to_idx
+        )
+    )
+
+    cat.nn_matrices["lyrics_audio"] = l2_normalize(
+        load_feature_matrix(
+            DATA / "nn_models/lyrics_bert_mfcc_bow_padding/f1_lyrics_bert_f2_mfcc_bow_padding/f2_lyrics_bert.tsv",
+            cat.id_to_idx
+        )
+    )
+
+    cat.nn_matrices["video_lyrics"] = l2_normalize(
+        load_feature_matrix(
+            DATA / "nn_models/vgg19_lyrics_bert_padding/f1_vgg19_f2_lyrics_bert_padding/f2_vgg19.tsv",
+            cat.id_to_idx
+        )
+    )
+
+    cat.nn_matrices["video_video"] = l2_normalize(
+        load_feature_matrix(
+            DATA / "nn_models/vgg19_vgg19_padding/f1_vgg19_f2_vgg19_padding/f2_vgg19.tsv",
+            cat.id_to_idx
+        )
+    )
+
+    cat.nn_matrices["audio_audio"] = l2_normalize(
+        load_feature_matrix(
+            DATA / "nn_models/mfcc_bow_mfcc_bow_padding/f1_mfcc_bow_f2_mfcc_bow_padding/f2_mfcc_bow.tsv",
+            cat.id_to_idx
+        )
+    )
 
     # import function that joins simple altigorithms and neural networks algorithms
     from mmsr_alg.retrieval.registry import get_combined_registry
@@ -82,6 +103,8 @@ st.markdown("""<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/li
 # --- Load data ---
 df = load_data()
 genres_dict = load_genres()
+system_metrics = None
+#system_metrics = precompute_all_system_metrics(cat, retrieval_system, retrieval_system.algorithms, 10)
 
 # --- Unique lists for dropdowns ---
 all_artists = sorted(df["artist"].dropna().unique().tolist())
@@ -204,6 +227,15 @@ for tab_idx, algo in enumerate(algorithms):
             st.markdown("### Evaluation Metrics")
             for k, v in metrics.items():
                 st.write(f"**{k}:** {v:.4f}")
+
+            st.markdown("---")
+            st.markdown("### Beyond-Accuracy (Global)")
+            if system_metrics is None:
+                st.write("System metrics not precomputed.")
+            else:
+                for k, v in system_metrics.items():
+                    if v is not None:
+                        st.write(f"**{k}:** {v:.4f}")
 
         # --- Results ---
         with results_col:

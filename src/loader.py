@@ -1,5 +1,6 @@
 import pandas as pd
 import ast
+from mmsr_alg.eval.runner import evaluate_algorithm_global
 import streamlit as st
 from pathlib import Path
 
@@ -27,3 +28,26 @@ def load_genres():
         except: return []
     df_gen[genre_col] = df_gen[genre_col].apply(safe_parse)
     return dict(zip(df_gen["id"].astype(str), df_gen[genre_col]))
+
+@st.cache_data
+def precompute_all_system_metrics(cat, _retrieval_system, _algos, max_k=20):
+    """
+    Precompute Coverage@k and Pop@k for all algorithms and k=1..max_k.
+    
+    Returns:
+        dict: {algo_name: {k: {"Coverage@k": ..., "Pop@k": ...}}}
+    """
+    all_metrics = {}
+
+    for algo_name in _algos.keys():
+        print(f"Precomputing system metrics for {algo_name}...")
+        algo_metrics = {}
+        for k in range(1, max_k+1):
+            cov, pop = evaluate_algorithm_global(cat, _retrieval_system, algo_name, k)
+            algo_metrics[k] = {
+                "Coverage@k": cov,
+                "Pop@k": pop
+            }
+        all_metrics[algo_name] = algo_metrics
+
+    return all_metrics

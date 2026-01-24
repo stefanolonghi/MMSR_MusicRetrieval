@@ -4,6 +4,7 @@ from typing import Dict, List
 from ..catalog import Catalog
 from .relevance import is_relevant
 from .metrics_accuracy import precision_at_k, recall_at_k, mrr_at_k, ndcg_at_k
+from .metrics_beyond import coverage_at_k, pop_at_k
 
 def evaluate_one_query(catalog: Catalog, query_id: str, ranked_ids: List[str], k: int) -> Dict[str, float]:
     qidx = catalog.id_to_idx[query_id]
@@ -29,4 +30,23 @@ def evaluate_one_query(catalog: Catalog, query_id: str, ranked_ids: List[str], k
         f"recall@{k}": recall_at_k(rels, total_rel, k),
         f"mrr@{k}": mrr_at_k(rels, k),
         f"ndcg@{k}": ndcg_at_k(rels, total_rel, k),
+    }
+
+def evaluate_algorithm_global(cat, _retrieval_system, _algo, k):
+    all_ranked_ids = {}
+
+    for qid in cat.id_to_idx.keys():
+        out = _retrieval_system.retrieve(
+            query_id=qid,
+            k=k,
+            algo=_algo
+        )
+        all_ranked_ids[qid] = out.ranked_ids
+
+    cov = coverage_at_k(all_ranked_ids, k, N=len(cat.id_to_idx))
+    pop = pop_at_k(cat, all_ranked_ids, k)
+
+    return {
+        "Coverage@k": cov,
+        "Pop@k": pop
     }
