@@ -29,7 +29,7 @@ METRICS = [
 ]
 
 HERE = Path(__file__).parent
-DATA = HERE/"data/retrieval"
+DATA = Path("src/data/retrieval")
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 

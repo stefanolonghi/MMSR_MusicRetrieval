@@ -33,4 +33,3 @@ def pop_at_k(catalog: Catalog, all_ranked_ids: Dict[str, List[str]], k: int) -> 
     if not per_query_means:
         return None
     return float(np.mean(per_query_means))
-
