@@ -1,8 +1,7 @@
-
 from .random_baseline import random_algo
 from .unimodal import lyrics_algo, audio_algo, video_algo
-from .fusion_late import late_fusion_algo, late_fusion_custom
-from .fusion_early import early_fusion_algo
+from .fusion_late import late_fusion_algo, late_fusion_custom, late_fusion_combo_algo
+from .fusion_early import early_fusion_algo, early_fusion_combo_algo
 from .system import RetrievalResult
 from .cosine import topk_cosine
 
@@ -14,9 +13,27 @@ def get_combined_registry(catalog):
         "lyrics": lyrics_algo,
         "audio": audio_algo,
         "video": video_algo,
+
         "early_fusion": early_fusion_algo,
         "late_fusion": late_fusion_algo,
     }
+
+    # ---- REQUIRED multimodal combinations (4 combos x early/late) ----
+    COMBOS = {
+        "AT":  ("audio", "text"),
+        "AV":  ("audio", "video"),
+        "TV":  ("text",  "video"),
+        "ATV": ("audio", "text", "video"),
+    }
+
+    for key, combo in COMBOS.items():
+        algos[f"early_{key}"] = (lambda combo=combo: (lambda cat, qidx, k, seed=None:
+            early_fusion_combo_algo(cat, qidx, k, combo=combo)
+        ))()
+
+        algos[f"late_{key}"] = (lambda combo=combo: (lambda cat, qidx, k, seed=None:
+            late_fusion_combo_algo(cat, qidx, k, combo=combo, normalize=True)
+        ))()
 
     # ---- Neural Network retrieval (STATIC) ----
     def nn_algo(matrix_key):

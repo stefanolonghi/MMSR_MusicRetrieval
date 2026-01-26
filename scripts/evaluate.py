@@ -8,7 +8,7 @@ from mmsr_alg.io import load_catalog
 from mmsr_alg.features import load_feature_matrix, l2_normalize
 from mmsr_alg.retrieval.system import RetrievalSystem
 from mmsr_alg.retrieval.registry import ALGORITHMS
-from mmsr_alg.retrieval.fusion_early import build_early_fusion_matrix
+from mmsr_alg.retrieval.fusion_early import build_early_fusion_from_blocks
 from mmsr_alg.eval.batch_runner import evaluate_algorithms
 
 DATA = Path("data/retrieval")
@@ -35,7 +35,10 @@ def main():
     cat.X_video  = l2_normalize(load_feature_matrix(DATA / "id_vgg19_mmsr.tsv", cat.id_to_idx))
 
     # Precompute early fusion
-    cat.X_early = build_early_fusion_matrix(cat.X_lyrics, cat.X_audio, cat.X_video, (1/3, 1/3, 1/3))
+    cat.X_early = build_early_fusion_from_blocks(
+        blocks=[cat.X_lyrics, cat.X_audio, cat.X_video],
+        weights=(1/3, 1/3, 1/3),
+    )
 
     system = RetrievalSystem(cat, ALGORITHMS)
 

@@ -10,7 +10,7 @@ from mmsr_alg.features import load_feature_matrix, l2_normalize
 from mmsr_alg.retrieval.fusion_late import late_fusion_custom
 from mmsr_alg.retrieval.system import RetrievalSystem
 from mmsr_alg.retrieval.registry import ALGORITHMS
-from mmsr_alg.retrieval.fusion_early import build_early_fusion_matrix
+from mmsr_alg.retrieval.fusion_early import build_early_fusion_from_blocks
 from mmsr_alg.utils import decorate_result
 from mmsr_alg.eval.runner import evaluate_one_query
 
@@ -38,7 +38,11 @@ def init_catalog_and_system():
         DATA / "id_vgg19_mmsr_part5.tsv"
     ], cat.id_to_idx)
 
-    cat.X_early = build_early_fusion_matrix(cat.X_lyrics, cat.X_audio, cat.X_video, (1/3, 1/3, 1/3))
+    cat.X_early = build_early_fusion_from_blocks(
+        blocks=[cat.X_lyrics, cat.X_audio, cat.X_video],
+        weights=(1/3, 1/3, 1/3),
+    )
+
 
 
 

@@ -1,5 +1,5 @@
-from dataclasses import dataclass
-from typing import Dict, List, Optional
+from dataclasses import dataclass,field
+from typing import Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 
@@ -13,6 +13,8 @@ class Catalog:
     X_audio: Optional[np.ndarray] = None
     X_video: Optional[np.ndarray] = None
     X_early: Optional[np.ndarray] = None
-
+    X_early_cache: Optional[Dict[Tuple[Tuple[str, ...], Tuple[float, ...]], np.ndarray]] = None
+    
     genres: Optional[List[set]] = None
     popularity: Optional[np.ndarray] = None
+    nn_matrices: Dict[str, np.ndarray] = field(default_factory=dict)
