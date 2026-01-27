@@ -14,8 +14,8 @@ def get_combined_registry(catalog):
         "audio": audio_algo,
         "video": video_algo,
 
-        "early_fusion": early_fusion_algo,
-        "late_fusion": late_fusion_algo,
+        #"early_fusion": early_fusion_algo,
+        #"late_fusion": late_fusion_algo,
     }
 
     # ---- REQUIRED multimodal combinations (4 combos x early/late) ----
