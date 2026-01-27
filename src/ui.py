@@ -1,5 +1,6 @@
 import streamlit as st
 import streamlit.components.v1 as components
+import pandas as pd
 from loader import load_data, load_genres, precompute_all_system_metrics
 from feature_utils import load_and_normalize_split 
 
@@ -16,6 +17,7 @@ from mmsr_alg.eval.runner import evaluate_one_query
 
 HERE = Path(__file__).parent
 DATA = HERE/"data/retrieval"
+METRICS_BEYOND_FILE = HERE/"data/metrics_beyond.tsv"
 
 @st.cache_resource
 def init_catalog_and_system():
@@ -42,9 +44,6 @@ def init_catalog_and_system():
         blocks=[cat.X_lyrics, cat.X_audio, cat.X_video],
         weights=(1/3, 1/3, 1/3),
     )
-
-
-
 
     #neural  network
     cat.nn_matrices = {}
@@ -107,8 +106,8 @@ st.markdown("""<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/li
 # --- Load data ---
 df = load_data()
 genres_dict = load_genres()
-system_metrics = None
-#system_metrics = precompute_all_system_metrics(cat, retrieval_system, retrieval_system.algorithms, 10)
+ # -- Load precomputed metrics ---
+metrics_df = pd.read_csv(METRICS_BEYOND_FILE, sep="\t")
 
 # --- Unique lists for dropdowns ---
 all_artists = sorted(df["artist"].dropna().unique().tolist())
@@ -218,6 +217,14 @@ for tab_idx, algo in enumerate(algorithms):
             ranked_ids,
             k=num_results
         )
+        
+        global_metrics_for_tab = metrics_df[
+            (metrics_df["Algorithm"] == algo) &
+            (metrics_df["QueryID"] == "GLOBAL") &
+            (metrics_df["k"] == num_results)
+        ]
+        global_metrics = dict(zip(global_metrics_for_tab["Metric"], global_metrics_for_tab["Value"]))
+
 
         if not ui_results:
             st.error("❌ No matching tracks found.")
@@ -234,12 +241,12 @@ for tab_idx, algo in enumerate(algorithms):
 
             st.markdown("---")
             st.markdown("### Beyond-Accuracy (Global)")
-            if system_metrics is None:
-                st.write("System metrics not precomputed.")
+            if not global_metrics:
+                st.write("Global metrics not found for this k.")
             else:
-                for k, v in system_metrics.items():
-                    if v is not None:
-                        st.write(f"**{k}:** {v:.4f}")
+                for k_name, v in global_metrics.items():
+                    st.write(f"**{k_name}:** {v:.4f}")
+
 
         # --- Results ---
         with results_col:

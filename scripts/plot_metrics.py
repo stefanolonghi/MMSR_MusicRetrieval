@@ -207,7 +207,48 @@ def compute_all_metrics(cat, retrieval_system, algos):
 # =========================
 # SAVE CSV
 # =========================
-def save_metrics_csv(results, path):
+def save_metrics_csv(results, path, k_for_report):
+    with open(path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow([
+            "algo",
+            "k",
+            "precision",
+            "recall",
+            "mrr",
+            "ndcg",
+            "coverage",
+            "pop",
+            "num_queries"
+        ])
+
+        for algo, metrics in results.items():
+            k = k_for_report
+
+            # metrics
+            precision = metrics["Precision@k"].get(k, None)
+            recall = metrics["Recall@k"].get(k, None)
+            mrr = metrics["MRR@k"].get(k, None)
+            ndcg = metrics["nDCG@k"].get(k, None)
+            coverage = metrics["Coverage@k"].get(k, None)
+            pop = metrics["Pop@k"].get(k, None)
+
+            # assume that Precision@k has None values for invalid queries
+            num_queries = sum(1 for v in metrics["Precision@k"].values() if v is not None)
+
+            writer.writerow([
+                algo,
+                k,
+                precision,
+                recall,
+                mrr,
+                ndcg,
+                coverage,
+                pop,
+                num_queries
+            ])
+
+
     with open(path, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(["Algorithm", "Metric", "k", "Value"])
@@ -244,6 +285,7 @@ def plot_metrics(results):
 # MAIN
 # =========================
 if __name__ == "__main__":
+    K = 10 # test for k=10
     cat, retrieval_system = init_catalog_and_system()
     ALGORITHMS = retrieval_system.algorithms
     all_algos = get_combined_registry(cat)
@@ -253,7 +295,7 @@ if __name__ == "__main__":
     print("X_lyrics:", cat.X_lyrics is not None)
 
     results = compute_all_metrics(cat, retrieval_system, all_algos)
-    save_metrics_csv(results, os.path.join(OUTPUT_DIR, "metrics.csv"))
+    save_metrics_csv(results, os.path.join(OUTPUT_DIR, "metrics.csv"), K)
     plot_metrics(results)
 
     print("Done. Metrics and plots saved.")
