@@ -1,262 +1,80 @@
+# MMSR – Multimodal Music Retrieval System (Group G)
+**Group components:**  Nishant Sunil Kale, Filip Kitic, Stefano Longhi, Alvaro Montes Sanchez, Maximiliano Paulino Rodriguez
 
-## What the UI imports and calls
+This repository contains the implementation of a content-based music retrieval system developed for the **Multimedia Search and Retrieval** practical project (2025/26). The framework integrates acoustic, textual, and visual signals to capture the multifaceted nature of musical similarity.
 
-### 1) Build the system once at app startup
+*   **Live Application:** [mmsrmusicretrieval-groupg.streamlit.app](https://mmsrmusicretrieval-groupg.streamlit.app/)
+*   **Source Code:** [github.com/stefanolonghii/MMSR_MusicRetrieval](https://github.com/stefanolonghii/MMSR_MusicRetrieval)
 
+## Core Features
+- **Multimodal Integration:** Unimodal retrieval (Audio, Lyrics, Video), Feature-level Early Fusion, and Decision-level Late Fusion (with Min-Max normalization).
+- **Neural Retrieval:** Six variants of Two-Tower neural architectures for cross-modal latent space alignment.
+- **Interactive Dashboard:** Side-by-side algorithm comparison with real-time accuracy and beyond-accuracy metrics.
+- **Multimedia Integration:** Dynamic YouTube embedding for qualitative audio-visual verification of results.
+
+---
+
+## 1. System Architecture
+The system is designed using a **Registry Pattern**, which decouples the retrieval logic from the presentation layer. At startup, the system initializes a global `Catalog` and registers all available algorithms.
+
+### System Initialization
 ```python
 from pathlib import Path
 from mmsr_alg.io import load_catalog
 from mmsr_alg.features import load_feature_matrix, l2_normalize
 from mmsr_alg.retrieval.system import RetrievalSystem
-from mmsr_alg.retrieval.registry import ALGORITHMS
-from mmsr_alg.retrieval.fusion_early import build_early_fusion_from_blocks
+from mmsr_alg.retrieval.registry import get_combined_registry
 
-DATA = Path("data/retrieval")
+DATA = Path("src/data/retrieval")
 
+# 1. Load Metadata and Handcrafted Features
 cat = load_catalog(DATA)
 cat.X_lyrics = l2_normalize(load_feature_matrix(DATA / "id_lyrics_bert_mmsr.tsv", cat.id_to_idx))
 cat.X_audio  = l2_normalize(load_feature_matrix(DATA / "id_mfcc_bow_mmsr.tsv", cat.id_to_idx))
 cat.X_video  = l2_normalize(load_feature_matrix(DATA / "id_vgg19_mmsr.tsv", cat.id_to_idx))
-cat.X_early  = build_early_fusion_from_blocks(
-    blocks=[cat.X_lyrics, cat.X_audio, cat.X_video],
-    weights=(1/3, 1/3, 1/3),
-)
 
+# 2. Initialize Neural Embedding Towers
+cat.nn_matrices = {
+    "lyrics_lyrics": l2_normalize(load_feature_matrix(DATA / "nn_models/.../f2_lyrics_bert.tsv", cat.id_to_idx)),
+    "video_audio": l2_normalize(load_feature_matrix(DATA / "nn_models/.../f2_vgg19.tsv", cat.id_to_idx)),
+    # ... additional towers
+}
 
-retrieval_system = RetrievalSystem(cat, ALGORITHMS)
+# 3. Build Registry and Engine
+all_algos = get_combined_registry(cat)
+retrieval_system = RetrievalSystem(cat, all_algos)
 ```
-
-The UI does this **once** (global singleton).
-
----
-
-### 2) On user query, call `retrieve(query_id, k, algo)`
+## 2. Retrieval Modalities
+The interface allows users to perform queries using various strategies:
+### Unimodal: 
+Audio (MFCC BoW), Text (BERT), or Video (VGG19) via Cosine Similarity.
+### Early Fusion: 
+Feature-level concatenation with weighted modality scaling.
+### Late Fusion: 
+Decision-level aggregation with Min-Max score normalization.
+### Neural Models: 
+Learned representations from Two-Tower architectures designed to bridge the "semantic gap."
 
 ```python
-res = retrieval_system.retrieve(
+# Execution example used by the UI
+result = retrieval_system.retrieve(
     query_id="01rMxQv6vhyE1oQX",
     k=10,
-    algo="late_fusion"
-)
-
-# res.ranked_ids -> list[str] of retrieved track ids
-# res.scores     -> optional list[float]
-```
-
-That’s the only algorithm call the UI needs.
-
----
-
-## How the UI gets metadata for display
-
-`Catalog` already contains the merged track table (`cat.tracks`) and cached genres. The UI can “decorate” results like this:
-
-```python
-from mmsr_alg.utils import decorate_result
-
-query_card = decorate_result(cat, [res.query_id])[0]
-retrieved_cards = decorate_result(cat, res.ranked_ids)
-```
-
-Each card has:
-
-* artist, song, album_name
-* genres
-* url (YouTube)
-
-So the UI can render:
-
-* query track header (artist/song/genres + YouTube link)
-* list of retrieved tracks with metadata + YouTube links
-* plus optional metric display (next section)
-
----
-
-## How the UI shows “accuracy” for the retrieved list
-
-For the selected query + algorithm output:
-
-```python
-from mmsr_alg.eval.runner import evaluate_one_query
-
-metrics = evaluate_one_query(cat, res.query_id, res.ranked_ids, k=10)
-# metrics: {'precision@10': ..., 'recall@10': ..., 'mrr@10': ..., 'ndcg@10': ...}
-```
-
-UI displays those numbers next to the results list.
-
----
-
-## Minimal interface summary 
-
-**Inputs from UI**
-
-* `query_id` (selected by typing artist/song/album in their UI search)
-* `k` (slider/dropdown)
-* `algo` (dropdown)
-
-**Outputs from your module**
-
-* `RetrievalResult`:
-
-  * `ranked_ids` (for results)
-  * `scores` (optional)
-* plus `decorate_result()` for metadata
-* plus `evaluate_one_query()` for accuracy metrics
-##  Core return type from the algorithms
-
-algorithms already return this dataclass:
-
-```python
-RetrievalResult(
-    query_id: str,
-    algo: str,
-    k: int,
-    ranked_ids: List[str],
-    scores: Optional[List[float]]
+    algo="late_ATV"
 )
 ```
 
-### Raw example (algorithm output)
+## 3. Evaluation Framework
+The system shows performance metrics based on a genre-overlap relevance proxy:
+- Accuracy Metrics: Precision@k, Recall@k, MRR, and nDCG.
+- Beyond-Accuracy Metrics: Catalog Coverage and Popularity.
 
-```python
-RetrievalResult(
-    query_id="01rMxQv6vhyE1oQX",
-    algo="late_fusion",
-    k=5,
-    ranked_ids=[
-        "ReikSabesID",
-        "ParamoreBrokenID",
-        "FMStaticMomentID",
-        "DeltaGoodremID",
-        "EnriqueMaybeID"
-    ],
-    scores=[0.91, 0.88, 0.85, 0.81, 0.79]
-)
-```
+## 4. Deployment and Verification
+The system is deployed via Streamlit Cloud, establishing a Continuous Deployment (CD) pipeline linked to this GitHub repository. The application dynamically provisions the environment based on the provided requirements.txt.
+The interface facilitates human-in-the-loop verification by integrating YouTube iframe embeds for every retrieved track, allowing users to assess the perceptual success of the mathematical similarity models.
 
-
----
-
-##  UI-facing format (what the UI actually consumes)
-
-The UI should receive a **fully decorated dictionary** like this:
-
-###  Final UI payload (recommended)
-
-```json
-{
-  "query": {
-    "id": "01rMxQv6vhyE1oQX",
-    "artist": "Against the Current",
-    "song": "Chasing Ghosts",
-    "album": "In Our Bones",
-    "genres": ["rock", "pop punk"],
-    "youtube_url": "https://www.youtube.com/watch?v=XXXX"
-  },
-  "algorithm": "late_fusion",
-  "k": 5,
-  "results": [
-    {
-      "rank": 1,
-      "id": "ReikSabesID",
-      "artist": "Reik",
-      "song": "Sabes",
-      "album": "Des/Amor",
-      "genres": ["rock", "latin pop"],
-      "youtube_url": "https://www.youtube.com/watch?v=ephwPrwaY20",
-      "score": 0.91,
-      "relevant": true
-    },
-    {
-      "rank": 2,
-      "id": "ParamoreBrokenID",
-      "artist": "Paramore",
-      "song": "We Are Broken",
-      "album": "Riot!",
-      "genres": ["pop punk", "emo"],
-      "youtube_url": "https://www.youtube.com/watch?v=Dnqu632aynU",
-      "score": 0.88,
-      "relevant": true
-    }
-  ],
-  "metrics": {
-    "precision@5": 0.6,
-    "recall@5": 0.0015,
-    "mrr@5": 1.0,
-    "ndcg@5": 0.62
-  }
-}
-```
-
-
-* everything pre-joined
-* no extra lookups
-* easy to render
-
----
-
-## Adapter function YOU should provide (important)
-
-Create **one function** that converts algorithm output → UI payload.
-
-### `src/mmsr_alg/ui_adapter.py`
-
-```python
-from typing import Dict, Any
-from .utils import decorate_result
-from .eval.runner import evaluate_one_query
-
-def retrieve_for_ui(system, catalog, query_id: str, k: int, algo: str) -> Dict[str, Any]:
-    res = system.retrieve(query_id=query_id, k=k, algo=algo)
-
-    query_meta = decorate_result(catalog, [query_id])[0]
-    results_meta = decorate_result(catalog, res.ranked_ids)
-
-    metrics = evaluate_one_query(catalog, query_id, res.ranked_ids, k)
-
-    ui_results = []
-    for i, item in enumerate(results_meta):
-        ui_results.append({
-            "rank": i + 1,
-            "id": item["id"],
-            "artist": item["artist"],
-            "song": item["song"],
-            "album": item["album_name"],
-            "genres": item["genres"],
-            "youtube_url": item["url"],
-            "score": None if res.scores is None else res.scores[i],
-            "relevant": (
-                bool(
-                    set(query_meta["genres"])
-                    & set(item["genres"])
-                )
-                if query_meta["genres"] and item["genres"]
-                else False
-            )
-        })
-
-    return {
-        "query": query_meta,
-        "algorithm": algo,
-        "k": k,
-        "results": ui_results,
-        "metrics": metrics
-    }
-```
-
----
-
-##  What the UI calls
-
-```python
-payload = retrieve_for_ui(system, cat, query_id, k=10, algo="early_fusion")
-```
-
-The UI **never touches**:
-
-* feature matrices
-* similarity
-* evaluation logic
-
----
+## Project Structure
+- src/mmsr_alg/retrieval/: Algorithmic implementations (Cosine, Fusion, Neural).
+- src/mmsr_alg/eval/: Quantitative evaluation modules.
+- src/ui.py: Streamlit dashboard and visual components.
+- scripts/: Offline evaluation and plotting utilities.
